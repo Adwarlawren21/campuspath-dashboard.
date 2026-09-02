@@ -4,925 +4,173 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CampusPath Technologies - Strategy Workspace</title>
+  
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React & Babel Standalone -->
+  
+  <!-- React 18 & ReactDOM -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel Standalone for JSX parsing -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- Lucide Icons -->
+  
+  <!-- Lucide Icons Bundle -->
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body class="bg-slate-900 text-slate-100">
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
   <div id="root"></div>
 
   <script type="text/babel">
-   import React, { useState, useRef, useMemo, useCallback } from "react";
-import {
-  Building2,
-  LineChart,
-  Target,
-  Layers,
-  ClipboardCheck,
-  CheckCircle2,
-  Circle,
-  Upload,
-  FileText,
-  X,
-  Send,
-  Sparkles,
-  RotateCcw,
-  ChevronRight,
-  Radio,
-  Paperclip,
-} from "lucide-react";
+    const { useState, useEffect } = React;
 
-// ---------------------------------------------------------------------------
-// Static stage configuration
-// ---------------------------------------------------------------------------
+    // Safe Lucide Icon Shim to prevent rendering crashes
+    const SafeIcon = ({ name, className = "w-5 h-5 inline-block" }) => {
+      useEffect(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      }, [name]);
 
-const STAGES = [
-  {
-    id: 1,
-    file: "company.md",
-    icon: Building2,
-    label: "Company Profile & Vision",
-    short: "Company Profile",
-    phase: "Discovery",
-    description:
-      "Establish who CampusPath Technologies is, the mission behind the product, and the university partners it exists to serve.",
-    checklist: [
-      "Define Core Mission",
-      "Identify Target Universities",
-      "Draft Value Proposition",
-      "Outline Founding Team & Advisors",
-    ],
-    files: [
-      { name: "company.md", size: "4.2 KB" },
-      { name: "mission-notes.txt", size: "1.1 KB" },
-    ],
-    messages: [
-      {
-        role: "ai",
-        text:
-          "Loaded **company.md**. CampusPath's mission reads as *'close the advising gap between intent-to-enroll and first day of class.'* Two things worth sharpening:\n\n- The mission doesn't yet name **who** feels the gap first — prospective students, or the registrar's office?\n- Your value proposition leans on **speed**, but the target universities you listed are mid-size public schools, where **staff headcount**, not speed, is usually the binding constraint.",
-      },
-    ],
-  },
-  {
-    id: 2,
-    file: "market.md",
-    icon: LineChart,
-    label: "Market Context & Higher-Ed Bottlenecks",
-    short: "Market Context",
-    phase: "Research",
-    description:
-      "Map the higher-education admissions and advising landscape, and pinpoint where enrollment workflows break down today.",
-    checklist: [
-      "Size the Addressable Institutions",
-      "Catalog Competing Tools",
-      "Document Advising Bottlenecks",
-      "Flag Regulatory / FERPA Constraints",
-    ],
-    files: [
-      { name: "market.md", size: "6.8 KB" },
-      { name: "competitor-scan.md", size: "3.4 KB" },
-    ],
-    messages: [
-      {
-        role: "ai",
-        text:
-          "Cross-referencing **market.md** with the deliverables checklist:\n\n- Your addressable list is **412 institutions**, but only 60 have advising staff ratios below the NACADA-recommended 1:300 — that's your real early-adopter wedge.\n- Competing tools cluster into two camps: **CRM-first** (Slate, Salesforce EDU) and **chat-first** (AdmitHub). CampusPath doesn't cleanly fit either — worth stating that explicitly.",
-      },
-    ],
-  },
-  {
-    id: 3,
-    file: "problem initial guess.md",
-    icon: Target,
-    label: "Enrollment Pain Points",
-    short: "Pain Points",
-    phase: "Problem Framing",
-    description:
-      "Turn market research into a sharp, falsifiable hypothesis about the specific enrollment pain CampusPath will solve first.",
-    checklist: [
-      "Draft Problem Statement",
-      "List Evidence From Interviews",
-      "Rank Pain Points by Severity",
-      "Identify the Primary Persona",
-    ],
-    files: [
-      { name: "problem initial guess.md", size: "5.1 KB" },
-      { name: "advisor-interviews.md", size: "9.7 KB" },
-    ],
-    messages: [
-      {
-        role: "ai",
-        text:
-          "Reviewing **problem initial guess.md** against the interview notes:\n\n- Your top-ranked pain point is *'students stall between accepted and confirmed.'* Interview evidence backs this — 7 of 9 advisors named it unprompted.\n- The problem statement is still framed around the **advisor's** workload. Consider a second framing centered on the **student's** experience, since your persona section names both.",
-      },
-    ],
-  },
-  {
-    id: 4,
-    file: "product initial guess.md",
-    icon: Layers,
-    label: "Workflow & System Architecture",
-    short: "Product Architecture",
-    phase: "Solution Design",
-    description:
-      "Sketch the first product hypothesis: the core workflow, system boundaries, and integration points with existing campus systems.",
-    checklist: [
-      "Diagram the Core Workflow",
-      "Define System Boundaries",
-      "List SIS / CRM Integrations",
-      "Note Open Technical Risks",
-    ],
-    files: [
-      { name: "product initial guess.md", size: "7.3 KB" },
-      { name: "architecture-sketch.md", size: "2.9 KB" },
-    ],
-    messages: [
-      {
-        role: "ai",
-        text:
-          "Read through **product initial guess.md**:\n\n- The workflow assumes a **direct SIS write-back**, which is the highest-risk integration on your list. Most registrars require a read-only sandbox period first.\n- Consider splitting **v1 scope** (nudge + status tracking) from **v2 scope** (write-back automation) so the architecture doesn't block on one integration.",
-      },
-    ],
-  },
-  {
-    id: 5,
-    file: "PRD & Final Mapping",
-    icon: ClipboardCheck,
-    label: "Final Requirements & Backlog",
-    short: "PRD & Mapping",
-    phase: "Specification",
-    description:
-      "Consolidate every prior stage into a final PRD: scoped requirements, a prioritized backlog, and success metrics for launch.",
-    checklist: [
-      "Compile Final PRD Sections",
-      "Prioritize the v1 Backlog",
-      "Define Launch Success Metrics",
-      "Confirm Stakeholder Sign-off",
-    ],
-    files: [
-      { name: "PRD-v1.md", size: "12.4 KB" },
-      { name: "backlog.csv", size: "3.0 KB" },
-    ],
-    messages: [
-      {
-        role: "ai",
-        text:
-          "Compiling the **Final PRD** from Stages 1–4:\n\n- Mission (Stage 1) + primary pain point (Stage 3) map cleanly to a single **v1 epic**: *'Confirmed-enrollment nudging.'*\n- Recommend launch metric: **days-to-confirmation, median**, since it directly reflects the Stage 3 problem statement and is measurable from existing SIS data.",
-      },
-    ],
-  },
-];
-
-const TOTAL_STAGES = STAGES.length;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function classNames(...c) {
-  return c.filter(Boolean).join(" ");
-}
-
-function buildAdvisorResponse(question, stage) {
-  const q = question.trim();
-  const lower = q.toLowerCase();
-
-  const closing = {
-    1: "Anchor every later stage back to this mission statement — Stage 3's problem framing should trace directly to it.",
-    2: "Keep this market data close; Stage 3's pain-point ranking should be evidence you cite from here.",
-    3: "This problem statement is the spine of the PRD — Stage 5 should quote it almost verbatim.",
-    4: "Flag any assumption here that depends on an external system you don't control yet.",
-    5: "Before sign-off, trace every backlog item back to a checklist item from Stages 1–4.",
-  }[stage.id];
-
-  let focus = `your question about **${stage.file}**`;
-  if (lower.includes("metric") || lower.includes("kpi")) {
-    focus = "**success metrics**";
-  } else if (lower.includes("risk")) {
-    focus = "**open risks**";
-  } else if (lower.includes("persona") || lower.includes("user")) {
-    focus = "**primary persona**";
-  } else if (lower.includes("competitor") || lower.includes("market")) {
-    focus = "**competitive landscape**";
-  }
-
-  return (
-    `Looking at ${focus} in the context of **${stage.label}**:\n\n` +
-    `- **Current stage focus:** ${stage.description}\n` +
-    `- **Relevant deliverable:** "${stage.checklist[0]}" is the closest open item to your question — worth revisiting before moving on.\n` +
-    `- **Source file:** ${stage.files[0].name} is the primary reference; ${stage.files[1].name} has supporting detail.\n\n` +
-    `${closing}`
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
-export default function CampusPathWorkspace() {
-  const [activeStageId, setActiveStageId] = useState(1);
-  const [checklistState, setChecklistState] = useState(() => {
-    const init = {};
-    STAGES.forEach((s) => {
-      init[s.id] = s.checklist.map(() => false);
-    });
-    return init;
-  });
-  const [filesByStage, setFilesByStage] = useState(() => {
-    const init = {};
-    STAGES.forEach((s) => {
-      init[s.id] = s.files.map((f) => ({ ...f, id: `${s.id}-${f.name}` }));
-    });
-    return init;
-  });
-  const [chatByStage, setChatByStage] = useState(() => {
-    const init = {};
-    STAGES.forEach((s) => {
-      init[s.id] = s.messages.map((m, i) => ({ ...m, id: `${s.id}-seed-${i}` }));
-    });
-    return init;
-  });
-  const [chatInput, setChatInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef(null);
-  const chatEndRef = useRef(null);
-
-  const activeStage = useMemo(
-    () => STAGES.find((s) => s.id === activeStageId),
-    [activeStageId]
-  );
-
-  const overallProgress = useMemo(() => {
-    let done = 0;
-    let total = 0;
-    STAGES.forEach((s) => {
-      const arr = checklistState[s.id] || [];
-      total += arr.length;
-      done += arr.filter(Boolean).length;
-    });
-    return total === 0 ? 0 : Math.round((done / total) * 100);
-  }, [checklistState]);
-
-  const stageProgress = useCallback(
-    (stageId) => {
-      const arr = checklistState[stageId] || [];
-      if (arr.length === 0) return 0;
-      return Math.round((arr.filter(Boolean).length / arr.length) * 100);
-    },
-    [checklistState]
-  );
-
-  const milestoneStatus = useMemo(() => {
-    const p = stageProgress(activeStageId);
-    if (p === 100) return "Complete";
-    if (p > 0) return "In Progress";
-    return "Not Started";
-  }, [activeStageId, stageProgress]);
-
-  const toggleChecklistItem = (index) => {
-    setChecklistState((prev) => {
-      const next = { ...prev };
-      const arr = [...(next[activeStageId] || [])];
-      arr[index] = !arr[index];
-      next[activeStageId] = arr;
-      return next;
-    });
-  };
-
-  const resetProgress = () => {
-    const init = {};
-    STAGES.forEach((s) => {
-      init[s.id] = s.checklist.map(() => false);
-    });
-    setChecklistState(init);
-    setActiveStageId(1);
-  };
-
-  const addFiles = (fileList) => {
-    const arr = Array.from(fileList || []);
-    if (arr.length === 0) return;
-    const additions = arr.map((f) => ({
-      id: `${activeStageId}-${f.name}-${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2, 7)}`,
-      name: f.name,
-      size: f.size ? `${(f.size / 1024).toFixed(1)} KB` : "0.0 KB",
-    }));
-    setFilesByStage((prev) => ({
-      ...prev,
-      [activeStageId]: [...(prev[activeStageId] || []), ...additions],
-    }));
-  };
-
-  const removeFile = (fileId) => {
-    setFilesByStage((prev) => ({
-      ...prev,
-      [activeStageId]: (prev[activeStageId] || []).filter(
-        (f) => f.id !== fileId
-      ),
-    }));
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    addFiles(e.dataTransfer.files);
-  };
-
-  const sendMessage = () => {
-    const text = chatInput.trim();
-    if (!text || isTyping) return;
-
-    const userMsg = {
-      id: `${activeStageId}-u-${Date.now()}`,
-      role: "user",
-      text,
+      return <i data-lucide={name.toLowerCase()} className={className}></i>;
     };
 
-    setChatByStage((prev) => ({
-      ...prev,
-      [activeStageId]: [...(prev[activeStageId] || []), userMsg],
-    }));
-    setChatInput("");
-    setIsTyping(true);
+    // Main App Component
+    const App = () => {
+      const [activeStage, setActiveStage] = useState(1);
+      const [messages, setMessages] = useState([
+        { sender: 'ai', text: 'Welcome to CampusPath Strategy Advisor! We are in Stage 1: company.md. How can I guide your profile setup?' }
+      ]);
+      const [input, setInput] = useState('');
 
-    const stageAtSend = activeStage;
+      const stages = [
+        { id: 1, name: 'company.md', label: 'Company Profile & Vision' },
+        { id: 2, name: 'market.md', label: 'Market Context & Bottlenecks' },
+        { id: 3, name: 'problem initial guess.md', label: 'Enrollment Pain Points' },
+        { id: 4, name: 'product initial guess.md', label: 'Workflow Architecture' },
+        { id: 5, name: 'PRD & Final Mapping', label: 'Final Requirements' }
+      ];
 
-    setTimeout(() => {
-      const aiMsg = {
-        id: `${activeStageId}-a-${Date.now()}`,
-        role: "ai",
-        text: buildAdvisorResponse(text, stageAtSend),
+      const handleSend = () => {
+        if (!input.trim()) return;
+        const userMsg = { sender: 'user', text: input };
+        setMessages(prev => [...prev, userMsg]);
+        setInput('');
+
+        setTimeout(() => {
+          setMessages(prev => [
+            ...prev,
+            { sender: 'ai', text: `[Stage ${activeStage} Context]: Received your input regarding CampusPath strategy. Proceeding with workflow mapping.` }
+          ]);
+        }, 600);
       };
-      setChatByStage((prev) => ({
-        ...prev,
-        [stageAtSend.id]: [...(prev[stageAtSend.id] || []), aiMsg],
-      }));
-      setIsTyping(false);
-      setTimeout(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 50);
-    }, 1400);
-  };
 
-  const handleChatKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  const activeChecklist = checklistState[activeStageId] || [];
-  const activeFiles = filesByStage[activeStageId] || [];
-  const activeMessages = chatByStage[activeStageId] || [];
-
-  return (
-    <div
-      className="w-full h-full min-h-screen flex flex-col"
-      style={{ backgroundColor: "#0F172A", color: "#F8FAFC" }}
-    >
-      {/* ---------------------------------------------------------------- */}
-      {/* HEADER */}
-      {/* ---------------------------------------------------------------- */}
-      <header
-        className="border-b px-6 py-5 flex-shrink-0"
-        style={{ borderColor: "#1E293B", backgroundColor: "#0B1220" }}
-      >
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{
-                background: "linear-gradient(135deg, #4F46E5, #4338CA)",
-              }}
-            >
-              <Building2 size={20} color="#F8FAFC" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold leading-tight tracking-tight">
-                CampusPath Technologies
-              </h1>
-              <p className="text-sm" style={{ color: "#94A3B8" }}>
-                Product Strategy &amp; Mapping Workspace
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={resetProgress}
-            className="flex items-center gap-2 text-sm px-3 py-2 rounded-md border transition-colors hover:bg-slate-800"
-            style={{ borderColor: "#334155", color: "#CBD5E1" }}
-          >
-            <RotateCcw size={14} />
-            Reset Progress
-          </button>
-        </div>
-
-        {/* Overall progress */}
-        <div className="mt-5">
-          <div className="flex items-center justify-between mb-1.5">
-            <span
-              className="text-xs font-medium uppercase tracking-wide"
-              style={{ color: "#94A3B8" }}
-            >
-              Overall Completion
-            </span>
-            <span className="text-xs font-semibold" style={{ color: "#A5B4FC" }}>
-              {overallProgress}%
-            </span>
-          </div>
-          <div
-            className="w-full h-2 rounded-full overflow-hidden"
-            style={{ backgroundColor: "#1E293B" }}
-          >
-            <div
-              className="h-full rounded-full transition-all duration-500 ease-out"
-              style={{
-                width: `${overallProgress}%`,
-                background: "linear-gradient(90deg, #6366F1, #818CF8)",
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Stage pipeline tabs */}
-        <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
-          {STAGES.map((stage) => {
-            const Icon = stage.icon;
-            const isActive = stage.id === activeStageId;
-            const sp = stageProgress(stage.id);
-            return (
-              <button
-                key={stage.id}
-                onClick={() => setActiveStageId(stage.id)}
-                className={classNames(
-                  "flex items-center gap-2 px-3.5 py-2.5 rounded-lg border text-left flex-shrink-0 transition-all min-w-[168px]",
-                  isActive ? "shadow-lg" : "hover:border-slate-500"
-                )}
-                style={{
-                  backgroundColor: isActive ? "#1E293B" : "#111827",
-                  borderColor: isActive ? "#6366F1" : "#1E293B",
-                }}
-              >
-                <div
-                  className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
-                  style={{
-                    backgroundColor: isActive ? "#4338CA" : "#1E293B",
-                  }}
-                >
-                  <Icon size={14} color={isActive ? "#F8FAFC" : "#94A3B8"} />
-                </div>
-                <div className="min-w-0">
-                  <div
-                    className="text-[11px] font-medium"
-                    style={{ color: isActive ? "#A5B4FC" : "#64748B" }}
-                  >
-                    Stage {stage.id}
-                  </div>
-                  <div
-                    className="text-xs font-medium truncate"
-                    style={{ color: isActive ? "#F8FAFC" : "#CBD5E1" }}
-                  >
-                    {stage.short}
-                  </div>
-                </div>
-                {sp === 100 && (
-                  <CheckCircle2
-                    size={14}
-                    color="#34D399"
-                    className="ml-auto flex-shrink-0"
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </header>
-
-      {/* ---------------------------------------------------------------- */}
-      {/* BODY: 60 / 40 split */}
-      {/* ---------------------------------------------------------------- */}
-      <div className="flex flex-1 min-h-0 flex-col lg:flex-row">
-        {/* ================= LEFT: 60% Dashboard ================= */}
-        <div
-          className="lg:w-[60%] w-full p-6 overflow-y-auto"
-          style={{ borderRight: "1px solid #1E293B" }}
-        >
-          {/* Stage description */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className="text-xs font-medium px-2 py-0.5 rounded"
-                style={{ backgroundColor: "#312E81", color: "#C7D2FE" }}
-              >
-                {activeStage.phase}
-              </span>
-              <ChevronRight size={12} color="#475569" />
-              <span className="text-xs" style={{ color: "#64748B" }}>
-                {activeStage.file}
-              </span>
-            </div>
-            <h2 className="text-xl font-semibold tracking-tight">
-              {activeStage.label}
-            </h2>
-            <p className="text-sm mt-1.5 leading-relaxed" style={{ color: "#94A3B8" }}>
-              {activeStage.description}
-            </p>
-          </div>
-
-          {/* Metrics row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-            <MetricCard
-              label="Active Phase"
-              value={activeStage.phase}
-              icon={Radio}
-              accent="#818CF8"
-            />
-            <MetricCard
-              label="Target File Output"
-              value={activeStage.file}
-              icon={FileText}
-              accent="#38BDF8"
-              small
-            />
-            <MetricCard
-              label="Milestone Status"
-              value={milestoneStatus}
-              icon={
-                milestoneStatus === "Complete" ? CheckCircle2 : Circle
-              }
-              accent={
-                milestoneStatus === "Complete"
-                  ? "#34D399"
-                  : milestoneStatus === "In Progress"
-                  ? "#FBBF24"
-                  : "#64748B"
-              }
-            />
-          </div>
-
-          {/* Deliverables checklist */}
-          <div
-            className="rounded-xl border p-5 mb-6"
-            style={{ backgroundColor: "#1E293B", borderColor: "#293548" }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <ClipboardCheck size={16} color="#A5B4FC" />
-                Deliverables Checklist
-              </h3>
-              <span className="text-xs" style={{ color: "#64748B" }}>
-                {activeChecklist.filter(Boolean).length}/{activeChecklist.length} done
-              </span>
-            </div>
-            <div className="space-y-2">
-              {activeStage.checklist.map((item, idx) => {
-                const checked = activeChecklist[idx];
-                return (
-                  <button
-                    key={item}
-                    onClick={() => toggleChecklistItem(idx)}
-                    className="w-full flex items-center gap-3 text-left px-3 py-2.5 rounded-lg transition-colors"
-                    style={{
-                      backgroundColor: checked ? "#1B2E4B" : "#111827",
-                    }}
-                  >
-                    {checked ? (
-                      <CheckCircle2
-                        size={18}
-                        color="#34D399"
-                        className="flex-shrink-0"
-                      />
-                    ) : (
-                      <Circle
-                        size={18}
-                        color="#475569"
-                        className="flex-shrink-0"
-                      />
-                    )}
-                    <span
-                      className={classNames(
-                        "text-sm",
-                        checked && "line-through"
-                      )}
-                      style={{ color: checked ? "#94A3B8" : "#E2E8F0" }}
-                    >
-                      {item}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* File vault */}
-          <div
-            className="rounded-xl border p-5"
-            style={{ backgroundColor: "#1E293B", borderColor: "#293548" }}
-          >
-            <h3 className="text-sm font-semibold mb-1 flex items-center gap-2">
-              <FileText size={16} color="#A5B4FC" />
-              Stage Knowledge Base &amp; Source Files (.md / .txt)
-            </h3>
-            <p className="text-xs mb-4" style={{ color: "#64748B" }}>
-              Files attached here are referenced directly by the AI Advisor for {activeStage.short}.
-            </p>
-
-            {/* Drop zone */}
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-lg border-2 border-dashed flex flex-col items-center justify-center py-7 cursor-pointer transition-colors mb-4"
-              style={{
-                borderColor: isDragging ? "#6366F1" : "#334155",
-                backgroundColor: isDragging ? "#1B2242" : "#111827",
-              }}
-            >
-              <Upload
-                size={22}
-                color={isDragging ? "#A5B4FC" : "#64748B"}
-                className="mb-2"
-              />
-              <p className="text-sm font-medium" style={{ color: "#CBD5E1" }}>
-                Drag &amp; drop files here, or click to browse
-              </p>
-              <p className="text-xs mt-1" style={{ color: "#64748B" }}>
-                .md and .txt files attach to Stage {activeStage.id}
-              </p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept=".md,.txt"
-                className="hidden"
-                onChange={(e) => {
-                  addFiles(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-
-            {/* File list */}
-            <div className="space-y-2">
-              {activeFiles.length === 0 && (
-                <p className="text-xs text-center py-3" style={{ color: "#475569" }}>
-                  No files attached to this stage yet.
-                </p>
-              )}
-              {activeFiles.map((f) => (
-                <div
-                  key={f.id}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
-                  style={{ backgroundColor: "#111827" }}
-                >
-                  <div
-                    className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: "#1E293B" }}
-                  >
-                    <FileText size={14} color="#818CF8" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div
-                      className="text-sm font-medium truncate"
-                      style={{ color: "#E2E8F0" }}
-                    >
-                      {f.name}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs" style={{ color: "#64748B" }}>
-                        {f.size}
-                      </span>
-                      <span
-                        className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1"
-                        style={{ backgroundColor: "#052E23", color: "#34D399" }}
-                      >
-                        <span
-                          className="w-1.5 h-1.5 rounded-full"
-                          style={{ backgroundColor: "#34D399" }}
-                        />
-                        Active / Referenced by AI
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => removeFile(f.id)}
-                    className="p-1.5 rounded-md hover:bg-slate-700 flex-shrink-0 transition-colors"
-                    aria-label={`Remove ${f.name}`}
-                  >
-                    <X size={14} color="#94A3B8" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ================= RIGHT: 40% AI Advisor ================= */}
-        <div
-          className="lg:w-[40%] w-full flex flex-col min-h-0"
-          style={{ backgroundColor: "#0B1220" }}
-        >
-          {/* Chat header */}
-          <div
-            className="px-5 py-4 border-b flex-shrink-0"
-            style={{ borderColor: "#1E293B" }}
-          >
-            <div className="flex items-center gap-2">
-              <Sparkles size={16} color="#A5B4FC" />
-              <h3 className="text-sm font-semibold">
-                CampusPath AI Advisor
-              </h3>
-              <span
-                className="text-[10px] px-1.5 py-0.5 rounded"
-                style={{ backgroundColor: "#312E81", color: "#C7D2FE" }}
-              >
-                Active Cloud Context
-              </span>
-              <span className="relative flex h-2 w-2 ml-auto flex-shrink-0">
-                <span
-                  className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                  style={{ backgroundColor: "#34D399" }}
-                />
-                <span
-                  className="relative inline-flex rounded-full h-2 w-2"
-                  style={{ backgroundColor: "#34D399" }}
-                />
-              </span>
-            </div>
-            <div
-              className="mt-3 text-xs px-3 py-2 rounded-lg flex items-center gap-2"
-              style={{ backgroundColor: "#1E293B", color: "#A5B4FC" }}
-            >
-              <Radio size={12} className="flex-shrink-0" />
-              Active Context: Stage {activeStage.id} (Referencing Stage Files &amp; Deliverables)
-            </div>
-          </div>
-
-          {/* Message stream */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
-            {activeMessages.map((m) => (
-              <ChatBubble key={m.id} message={m} />
-            ))}
-            {isTyping && (
-              <div className="flex justify-start">
-                <div
-                  className="rounded-xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5"
-                  style={{ backgroundColor: "#334155" }}
-                >
-                  <TypingDot delay="0ms" />
-                  <TypingDot delay="150ms" />
-                  <TypingDot delay="300ms" />
-                  <span className="text-xs ml-1.5" style={{ color: "#94A3B8" }}>
-                    AI is analyzing active stage files...
-                  </span>
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Chat input */}
-          <div
-            className="p-4 border-t flex-shrink-0"
-            style={{ borderColor: "#1E293B" }}
-          >
-            <div className="flex items-end gap-2">
-              <div
-                className="flex-1 flex items-center gap-2 rounded-lg px-3 py-2 border"
-                style={{ backgroundColor: "#1E293B", borderColor: "#334155" }}
-              >
-                <Paperclip size={14} color="#64748B" className="flex-shrink-0" />
-                <input
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={handleChatKeyDown}
-                  placeholder={`Ask about ${activeStage.file}...`}
-                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-500"
-                  style={{ color: "#F8FAFC" }}
-                />
-              </div>
-              <button
-                onClick={sendMessage}
-                disabled={!chatInput.trim() || isTyping}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ backgroundColor: "#4F46E5", color: "#F8FAFC" }}
-              >
-                <Send size={14} />
-                Send
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function MetricCard({ label, value, icon: Icon, accent, small }) {
-  return (
-    <div
-      className="rounded-xl border p-4"
-      style={{ backgroundColor: "#1E293B", borderColor: "#293548" }}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <span
-          className="text-xs font-medium uppercase tracking-wide"
-          style={{ color: "#64748B" }}
-        >
-          {label}
-        </span>
-        <Icon size={15} color={accent} />
-      </div>
-      <div
-        className={classNames(
-          "font-semibold truncate",
-          small ? "text-sm" : "text-base"
-        )}
-        style={{ color: "#F8FAFC" }}
-        title={value}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function TypingDot({ delay }) {
-  return (
-    <span
-      className="w-1.5 h-1.5 rounded-full animate-bounce"
-      style={{ backgroundColor: "#94A3B8", animationDelay: delay }}
-    />
-  );
-}
-
-function renderInlineMarkdown(text, keyPrefix) {
-  // Bold (**text**) support, split preserving segments
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={`${keyPrefix}-${i}`} style={{ color: "#F8FAFC" }}>
-          {part.slice(2, -2)}
-        </strong>
-      );
-    }
-    return <React.Fragment key={`${keyPrefix}-${i}`}>{part}</React.Fragment>;
-  });
-}
+        <div class="p-6 max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex justify-between items-center">
+            <div>
+              <h1 class="text-2xl font-bold text-indigo-400 flex items-center gap-2">
+                <SafeIcon name="layers" className="w-6 h-6 text-indigo-400" />
+                CampusPath Technologies | Strategy Workspace
+              </h1>
+              <p class="text-slate-400 text-sm mt-1">Structured 5-Stage Higher-Ed Product Strategy Mapping</p>
+            </div>
+            <div class="text-right">
+              <span class="text-xs uppercase tracking-wider text-slate-400">Total Completion</span>
+              <div class="text-2xl font-bold text-indigo-300">{(activeStage / 5) * 100}%</div>
+            </div>
+          </div>
 
-function ChatBubble({ message }) {
-  const isUser = message.role === "user";
-  const lines = message.text.split("\n").filter((l) => l.length > 0);
+          {/* Navigation Pipeline */}
+          <div class="grid grid-cols-5 gap-2">
+            {stages.map(s => (
+              <button
+                key={s.id}
+                onClick={() => setActiveStage(s.id)}
+                class={`p-3 rounded-lg text-left border transition-all ${
+                  activeStage === s.id
+                    ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                <div class="text-xs font-semibold uppercase">Stage {s.id}</div>
+                <div class="text-sm font-bold truncate">{s.name}</div>
+              </button>
+            ))}
+          </div>
 
-  return (
-    <div className={classNames("flex", isUser ? "justify-end" : "justify-start")}>
-      <div
-        className={classNames(
-          "max-w-[88%] px-4 py-3 text-sm leading-relaxed",
-          isUser ? "rounded-xl rounded-br-sm" : "rounded-xl rounded-bl-sm"
-        )}
-        style={{
-          backgroundColor: isUser ? "#4338CA" : "#334155",
-          color: isUser ? "#F8FAFC" : "#E2E8F0",
-        }}
-      >
-        {lines.map((line, idx) => {
-          const trimmed = line.trim();
-          if (trimmed.startsWith("- ")) {
-            return (
-              <div key={idx} className="flex gap-2 mt-1.5 first:mt-0">
-                <span style={{ color: "#A5B4FC" }}>•</span>
-                <span>{renderInlineMarkdown(trimmed.slice(2), `l${idx}`)}</span>
+          {/* Split Workspace */}
+          <div class="grid grid-cols-12 gap-6">
+            {/* Left Dashboard Panel */}
+            <div class="col-span-7 space-y-6">
+              <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4">
+                <h2 class="text-lg font-semibold text-slate-200 flex items-center gap-2">
+                  <SafeIcon name="file-text" /> Active Workspace: {stages[activeStage - 1].name}
+                </h2>
+                <p class="text-slate-400 text-sm">{stages[activeStage - 1].label}</p>
+                
+                {/* File Vault */}
+                <div class="border-2 border-dashed border-slate-600 p-4 rounded-lg text-center bg-slate-900/50">
+                  <SafeIcon name="upload-cloud" className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  <p class="text-sm text-slate-300">Upload source files for Stage {activeStage}</p>
+                  <input type="file" class="mt-2 text-xs text-slate-400" />
+                </div>
               </div>
-            );
-          }
-          return (
-            <p key={idx} className="mt-1.5 first:mt-0">
-              {renderInlineMarkdown(line, `l${idx}`)}
-            </p>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+            </div>
+
+            {/* Right Active Chat Panel */}
+            <div class="col-span-5 bg-slate-800 rounded-xl border border-slate-700 flex flex-col h-[480px]">
+              <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+                <span class="font-semibold text-sm flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  CampusPath AI Advisor
+                </span>
+                <span class="text-xs text-slate-400">Context: Stage {activeStage}</span>
+              </div>
+
+              {/* Messages Window */}
+              <div class="flex-1 p-4 overflow-y-auto space-y-3">
+                {messages.map((m, idx) => (
+                  <div key={idx} class={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div class={`max-w-[85%] text-sm p-3 rounded-xl ${
+                      m.sender === 'user'
+                        ? 'bg-indigo-600 text-white rounded-br-none'
+                        : 'bg-slate-700 text-slate-200 rounded-bl-none'
+                    }`}>
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Chat Input Bar */}
+              <div class="p-3 border-t border-slate-700 flex gap-2">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  placeholder="Ask advisor or type specification..."
+                  class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                />
+                <button
+                  onClick={handleSend}
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Render App Component to DOM
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>
